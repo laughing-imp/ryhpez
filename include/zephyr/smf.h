@@ -16,6 +16,18 @@
 #include <zephyr/sys/util.h>
 
 /**
+ * @brief Validates that a state member is not used when its associated
+ * Kconfig is disabled. This throws an error when the Kconfig is disabled
+ * and a non null value is passed as _val.
+ */
+/**
+ * @brief Validates that a state member is not used when its associated
+ * Kconfig is disabled.
+ */
+#define SMF_VALIDATE_NON_NULL(_conf, _val, _err_msg)                                               \
+	(sizeof(struct { int _err_msg: (IS_ENABLED(_conf) || ((_val) == NULL) ? 1 : -1); }) * 0)
+
+/**
  * @brief State Machine Framework API
  * @defgroup smf State Machine Framework API
  * @version 0.2.0
@@ -33,13 +45,17 @@
  * @param _initial State initial transition object or NULL
  */
 /* clang-format off */
-#define SMF_CREATE_STATE(_entry, _run, _exit, _parent, _initial)           \
-{                                                                          \
-	.entry   = _entry,                                                 \
-	.run     = _run,                                                   \
-	.exit    = _exit,                                                  \
-	IF_ENABLED(CONFIG_SMF_ANCESTOR_SUPPORT, (.parent = _parent,))      \
-	IF_ENABLED(CONFIG_SMF_INITIAL_TRANSITION, (.initial = _initial,))  \
+#define SMF_CREATE_STATE(_entry, _run, _exit, _parent, _initial)  \
+{                                                                 \
+    .entry   = (state_method)((uintptr_t)(_entry) +               \
+               SMF_VALIDATE_NON_NULL(CONFIG_SMF_ANCESTOR_SUPPORT, \
+                    _parent, PARENT_SET_BUT_CONFIG_DISABLED) +    \
+               SMF_VALIDATE_NON_NULL(CONFIG_SMF_INITIAL_TRANSITION, \
+                    _initial, INITIAL_SET_BUT_CONFIG_DISABLED)),  \
+    .run     = _run,                                              \
+    .exit    = _exit,                                             \
+    IF_ENABLED(CONFIG_SMF_ANCESTOR_SUPPORT, (.parent = _parent,)) \
+    IF_ENABLED(CONFIG_SMF_INITIAL_TRANSITION, (.initial = _initial,)) \
 }
 /* clang-format on */
 
